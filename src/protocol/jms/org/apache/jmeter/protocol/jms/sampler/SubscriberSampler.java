@@ -17,6 +17,8 @@
 
 package org.apache.jmeter.protocol.jms.sampler;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Enumeration;
 
 import javax.jms.BytesMessage;
@@ -27,6 +29,8 @@ import javax.jms.ObjectMessage;
 import javax.jms.TextMessage;
 import javax.naming.NamingException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.undercouch.bson4jackson.BsonFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.protocol.jms.Utils;
 import org.apache.jmeter.protocol.jms.client.InitialContextFactory;
@@ -247,7 +251,17 @@ public class SubscriberSampler extends BaseJMSSampler implements Interruptible, 
                     }
                 } else if (msg instanceof BytesMessage){
                     BytesMessage bytesMessage = (BytesMessage) msg;
-                    buffer.append(bytesMessage.getBodyLength() + " bytes received in BytesMessage");
+                    bytesMessage.reset();
+                    ObjectMapper mapper = new ObjectMapper(new BsonFactory());
+                    byte[] bytes = new byte[(int) bytesMessage.getBodyLength()];
+                    bytesMessage.readBytes(bytes);
+                    try {
+                        ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+                        buffer.append(mapper.readTree(bais).toString());
+                    }
+                    catch (IOException e) {
+                        log.error(e.getMessage());
+                    }
                 } else if (msg instanceof MapMessage){
                     MapMessage mapm = (MapMessage) msg;
                     @SuppressWarnings("unchecked") // MapNames are Strings
